@@ -3,6 +3,7 @@ import axios from "axios";
 import Upload from "./components/Upload";
 import GraphView from "./components/GraphView";
 import RingTable from "./components/RingTable";
+import muleLogo from "./assets/mule-logo.png";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -160,9 +161,16 @@ function App() {
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="font-display text-2xl font-bold tracking-[0.18em] text-transparent bg-gradient-to-r from-cyan-300 via-teal-200 to-emerald-300 bg-clip-text"
+          className="flex items-center gap-2"
         >
-          MULE
+          <img
+            src={muleLogo}
+            alt="MULE logo"
+            className="h-10 w-10 rounded object-contain md:h-11 md:w-11"
+          />
+          <span className="font-display text-2xl font-bold tracking-[0.18em] text-transparent bg-gradient-to-r from-cyan-300 via-teal-200 to-emerald-300 bg-clip-text">
+            MULE
+          </span>
         </button>
 
         <button

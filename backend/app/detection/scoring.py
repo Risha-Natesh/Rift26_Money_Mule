@@ -10,12 +10,15 @@ from app.detection.preprocess import PreprocessResult
 
 
 PATTERN_ORDER = [
-    "cycle",
-    "smurfing",
-    "shell",
-    "merchant",
-    "payroll",
-    "velocity",
+    "cycle_length_3",
+    "cycle_length_4",
+    "cycle_length_5",
+    "fan_in",
+    "fan_out",
+    "shell_chain",
+    "merchant_laundering",
+    "payroll_abuse",
+    "high_velocity",
 ]
 
 ROLE_MULTIPLIER = {
@@ -158,11 +161,38 @@ def calculate_scores(
 ) -> tuple[dict[str, float], dict[str, set[str]], dict[str, float]]:
     accounts = list(ctx.accounts)
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    cycle_labels: dict[str, set[str]] = defaultdict(set)
+    fan_in_accounts: set[str] = set()
+    fan_out_accounts: set[str] = set()
+    shell_accounts: set[str] = set()
+    merchant_accounts: set[str] = set()
+    payroll_accounts: set[str] = set()
 
     for ring in rings:
         pattern = str(ring.get("pattern_type", ""))
         for account in ring.get("member_accounts", []):
             counts[pattern][str(account)] += 1
+        if pattern == "cycle":
+            cycle_length = int(ring.get("cycle_length", 0))
+            if cycle_length in (3, 4, 5):
+                label = f"cycle_length_{cycle_length}"
+                for account in ring.get("member_accounts", []):
+                    cycle_labels[str(account)].add(label)
+        if pattern == "smurfing":
+            receiver = str(ring.get("receiver", ""))
+            if receiver:
+                fan_in_accounts.add(receiver)
+            for sender in ring.get("senders", []):
+                fan_out_accounts.add(str(sender))
+        if pattern == "shell":
+            for account in ring.get("member_accounts", []):
+                shell_accounts.add(str(account))
+        if pattern == "merchant":
+            for account in ring.get("member_accounts", []):
+                merchant_accounts.add(str(account))
+        if pattern == "payroll":
+            for account in ring.get("member_accounts", []):
+                payroll_accounts.add(str(account))
 
     cycle_scores = _normalize_counts(accounts, counts.get("cycle", {}))
     smurf_scores = _normalize_counts(accounts, counts.get("smurfing", {}))
@@ -213,18 +243,20 @@ def calculate_scores(
         score = 100.0 * (1.0 / (1.0 + math.exp(-6.0 * (value - mu))))
         scores[account] = _round2(_clamp(score, 0.0, 100.0))
 
-        if cycle_scores.get(account, 0.0) > 0:
-            patterns[account].add("cycle")
-        if smurf_scores.get(account, 0.0) > 0:
-            patterns[account].add("smurfing")
-        if shell_scores.get(account, 0.0) > 0:
-            patterns[account].add("shell")
-        if merchant_scores.get(account, 0.0) > 0:
-            patterns[account].add("merchant")
-        if payroll_scores.get(account, 0.0) > 0:
-            patterns[account].add("payroll")
+        for label in sorted(cycle_labels.get(account, set())):
+            patterns[account].add(label)
+        if account in fan_in_accounts:
+            patterns[account].add("fan_in")
+        if account in fan_out_accounts:
+            patterns[account].add("fan_out")
+        if account in shell_accounts and shell_scores.get(account, 0.0) > 0:
+            patterns[account].add("shell_chain")
+        if account in merchant_accounts and merchant_scores.get(account, 0.0) > 0:
+            patterns[account].add("merchant_laundering")
+        if account in payroll_accounts and payroll_scores.get(account, 0.0) > 0:
+            patterns[account].add("payroll_abuse")
         if velocity_scores.get(account, 0.0) > 0:
-            patterns[account].add("velocity")
+            patterns[account].add("high_velocity")
 
     return scores, patterns, velocity_scores
 

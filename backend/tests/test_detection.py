@@ -181,9 +181,9 @@ def test_smurfing_includes_72h_boundary() -> None:
 
 def test_shell_detection_identifies_layered_paths() -> None:
     records = [
-        ("S001", "SRC", "MID1", 200.0, "2026-01-01 01:00:00"),
-        ("S002", "MID1", "MID2", 199.0, "2026-01-01 01:10:00"),
-        ("S003", "MID2", "DST", 198.0, "2026-01-01 01:20:00"),
+        ("S001", "SRC", "MID1", 1000.0, "2026-01-01 01:00:00"),
+        ("S002", "MID1", "MID2", 980.0, "2026-01-01 01:10:00"),
+        ("S003", "MID2", "DST", 970.0, "2026-01-01 01:20:00"),
     ]
     df = _build_df(records)
     ctx = preprocess_transactions(df)
@@ -192,6 +192,21 @@ def test_shell_detection_identifies_layered_paths() -> None:
     assert any(record["path"] == ("SRC", "MID1", "MID2", "DST") for record in paths)
     assert "MID1" in shell_nodes
     assert "MID2" in shell_nodes
+
+
+def test_shell_detection_rejects_topology_only_linear_chain() -> None:
+    records = [
+        ("L001", "N1", "N2", 100.0, "2026-01-01 01:00:00"),
+        ("L002", "N2", "N3", 130.0, "2026-01-01 01:20:00"),
+        ("L003", "N3", "N4", 95.0, "2026-01-01 01:40:00"),
+        ("L004", "N4", "N5", 150.0, "2026-01-01 02:00:00"),
+    ]
+    df = _build_df(records)
+    ctx = preprocess_transactions(df)
+    paths, shell_nodes = detect_shell_paths(ctx)
+
+    assert paths == []
+    assert shell_nodes == set()
 
 
 def test_trap_shell_not_combinatorial_ring_explosion() -> None:

@@ -31,6 +31,10 @@ def _round2(value: float) -> float:
     return float(f"{value:.2f}")
 
 
+def _sanitize_patterns(patterns: list[object]) -> list[str]:
+    return [str(pattern) for pattern in patterns]
+
+
 def _dedupe_rings(ring_candidates: list[dict[str, object]]) -> list[dict[str, object]]:
     registry: dict[frozenset[str], dict[str, object]] = {}
 
@@ -90,8 +94,6 @@ def build_detection_result(
 
     cycles, _ = detect_cycles(ctx)
     smurf_rings = detect_smurfing(ctx)
-    shell_rings, shell_nodes = detect_shell_paths(ctx)
-
     cycle_nodes = {
         str(account)
         for cycle in cycles
@@ -102,6 +104,7 @@ def build_detection_result(
         for ring in smurf_rings
         for account in ring.get("member_accounts", [])
     }
+    shell_rings, shell_nodes = detect_shell_paths(ctx)
     suspicious_seed = set().union(cycle_nodes, smurf_nodes, shell_nodes)
 
     merchant_rings, legitimate_merchants = detect_merchant_laundering(ctx, suspicious_seed)
@@ -127,12 +130,13 @@ def build_detection_result(
         if score < suspicious_min_score or not detected:
             continue
 
+        detected_patterns = _sanitize_patterns(ordered_patterns(detected))
         suspicious_accounts.append(
             {
-                "account_id": account,
-                "suspicion_score": score,
-                "detected_patterns": ordered_patterns(detected),
-                "ring_id": account_ring[account],
+                "account_id": str(account),
+                "suspicion_score": float(_round2(min(100.0, max(0.0, score)))),
+                "detected_patterns": detected_patterns,
+                "ring_id": str(account_ring[account]),
             }
         )
 
@@ -207,7 +211,7 @@ async def analyze_csv(file: UploadFile = File(...)) -> JSONResponse:
         result["summary"]["processing_time_seconds"] = _round2(timer.elapsed_seconds)
         serialized = json.dumps(
             result,
-            separators=(",", ":"),
+            indent=2,
             ensure_ascii=False,
         )
         app.state.last_result_json = serialized
@@ -237,4 +241,3 @@ async def download_result() -> Response:
 
     headers = {"Content-Disposition": "attachment; filename=detection_results.json"}
     return Response(content=last_result_json, media_type="application/json", headers=headers)
-    suspicious_min_score = float(os.getenv("SUSPICIOUS_MIN_SCORE", "20"))
