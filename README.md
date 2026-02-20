@@ -4,8 +4,7 @@
 RIFT 2026 Money Muling Detection System
 
 ## Live Demo URL
-https://example.com/rift-2026-demo
-
+https://rift26-money-mule.vercel.app/
 ## Tech Stack
 - Backend: FastAPI, Pandas, NetworkX
 - Frontend: React (Vite), Tailwind CSS, Axios, react-force-graph
